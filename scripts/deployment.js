@@ -18,7 +18,8 @@ var tokenName = [];//[ "OmiseGO", "Digix", "Civic", "FunFair", "Monaco", "Golem"
 var tokenDecimals = [];//[18,9,8,8,8,18,4,18,18,18,18,18]
 
 var tokenInitialReserveBalance = [];
-
+var tokenToEthRate = [];
+var ethToTokenRate = [];
 var reserveInitialEth;
 
 var tokenInstance = [];
@@ -89,6 +90,8 @@ var parseInput = function( jsonInput ) {
       var symbol = key;
       var name = val["name"];
       var decimals = val["decimals"];
+      var ethToTokRate = val["ethToTokenRate"];
+      var tokToEthRate = val["tokenToEthRate"];
       var initialBalance = val["reserve balance"];
       if( initialBalance === undefined ) {
         initialBalance = jsonInput["default reserve balances"]["token"];
@@ -98,6 +101,8 @@ var parseInput = function( jsonInput ) {
       tokenName.push(name);
       tokenDecimals.push(decimals);
       tokenInitialReserveBalance.push(initialBalance);
+      tokenToEthRate.push(tokToEthRate);
+      ethToTokenRate.push(ethToTokRate);
     });
 
     // exchanges
@@ -328,6 +333,7 @@ var listTokens = function( owner, reserve, network, expBlock, rate, convRate ) {
   return new Promise(function (fulfill, reject){
 
       var inputs = [];
+      var j = 0;
 
       for (var i = 0 ; i < tokenInstance.length ; i++ ) {
           inputs.push(tokenInstance[i]);
@@ -346,8 +352,8 @@ var listTokens = function( owner, reserve, network, expBlock, rate, convRate ) {
       }).then(function(decimals){
           return pricing.setTokenControlInfo( tokenAddress,
                                               10**(decimals-2),
-                                              (10 ** decimals) * 10000,
-                                              (10 ** decimals) * 1000000 );
+                                              (10 ** decimals) * 1000000,
+                                              (10 ** decimals) * 100000000 );
       }).then(function(){
           return pricing.enableTokenTrade( tokenAddress );
       }).then(function(){
@@ -367,9 +373,12 @@ var listTokens = function( owner, reserve, network, expBlock, rate, convRate ) {
                                           x,
                                           y );
       }).then(function(){
+//        console.log(" ethToTokenRate[item]  " + ethToTokenRate[j]);
+//        console.log("tokenToEthRate[item]  " + tokenToEthRate[j] + " j " + j  );
+
         return pricing.setBasePrice( [tokenAddress],
-                                     [convRate],
-                                     [rate],
+                                     [ethToTokenRate[j]],
+                                     [tokenToEthRate[j++]],
                                      [0/*,2,3,4,5,6,7,8,9,10,11,12,13,14*/],
                                      [0/*,2,3,4,5,6,7,8,9,10,11,12,13,14*/],
                                      web3.eth.blockNumber,
@@ -455,7 +464,7 @@ contract('Deployment', function(accounts) {
 
   it("create bank and transfer funds", function() {
     this.timeout(31000000);
-    var amount = (new BigNumber(10)).pow(40+18);
+    var amount = (new BigNumber(10)).pow(10);
     return Bank.new().then(function(instance){
         bank = instance;
         return transferFundsToBank(tokenOwner, bank.address, amount);
@@ -487,7 +496,7 @@ contract('Deployment', function(accounts) {
     }).then(function(){
           return whitelist.setUserCategory("0x9f1a678b0079773b5c4f5aa8573132d2b8bcb1e7",2);
     }).then(function(){
-      return whitelist.setSgdToEthRate((new BigNumber(10).pow(15)).mul(2));
+      return whitelist.setSgdToEthRate(0x926784059314179);
     });
   });
 
@@ -515,7 +524,7 @@ contract('Deployment', function(accounts) {
     return Reserve.new(network.address,pricing.address, reserveOwner,{gas:4700000}).then(function(instance){
         reserve = instance;
     }).then(function(){
-        return pricing.setValidPriceDurationInBlocks(new BigNumber(1000000));
+        return pricing.setValidPriceDurationInBlocks(new BigNumber('10000000'));
     }).then(function(){
         return pricing.setReserveAddress(reserve.address);
     }).then(function(){
@@ -549,7 +558,7 @@ contract('Deployment', function(accounts) {
   it("withdraw token from exchange", function() {
     this.timeout(31000000);
     var depositAddress = exchangeDepositAddresses[0][tokenSymbol[0]];
-    return exchangesInstance[1].withdraw(tokenInstance[0].address,2,depositAddress,{from:tokenOwner}).then(function(){
+    return exchangesInstance[0].withdraw(tokenInstance[0].address,2,depositAddress,{from:tokenOwner}).then(function(){
       return tokenInstance[0].balanceOf(depositAddress);
     }).then(function(result){
       assert.equal(result.valueOf(), new BigNumber(2).valueOf(), "unexpected balance");
@@ -565,7 +574,6 @@ contract('Deployment', function(accounts) {
       assert.equal(result.valueOf(), new BigNumber(1).valueOf(), "unexpected balance");
     });
   });
-
 
 
   it("create burning fees", function() {
@@ -584,6 +592,8 @@ contract('Deployment', function(accounts) {
       return feeBurner.setKyberNetwork(network.address);
     }).then(function(){
       return feeBurner.setWalletFees(0,50);
+    }).then(function() {
+      return feeBurner.setKNCRate(292);
     });
   });
 
@@ -653,7 +663,7 @@ contract('Deployment', function(accounts) {
   it("transfer ownership in exchanges", function() {
     this.timeout(30000000);
     return transferOwnershipInExchangesAndBank(tokenOwner,nam).then(function(){
-    return exchangesInstance[1].owners(nam[1]);
+    return exchangesInstance[0].owners(nam[1]);
   }).then(function(result){
     assert.equal(result.valueOf(),true.valueOf(), "unexpected owner address");
   });
@@ -675,31 +685,30 @@ it("make some optimizations", function() {
 });
 
 
-it("set eth to dgd rate", function() {
-  return getBlockNumberWithPromise().then(function(blockNumber){
-    return pricing.setBasePrice( [tokenInstance[1].address],
-                                 [0x47d40a969bd7c0021],
-                                 [conversionRate],
-                                 [0],
-                                 [0],
-                                 blockNumber,
-                                 [0] );
-  });
-});
-
-
+//it("set eth to dgd rate", function() {
+//  return getBlockNumberWithPromise().then(function(blockNumber){
+//    return pricing.setBasePrice( [tokenInstance[1].address],
+//                                 [0x47d40a969bd7c0021],
+//                                 [conversionRate],
+//                                 [0],
+//                                 [0],
+//                                 blockNumber,
+//                                 [0] );
+//  });
+//});
 
   it("do a single exchange", function() {
     this.timeout(31000000);
-    var dgdAddress = tokenInstance[1].address;
+    var index = 1;
+    var tokenAddress = tokenInstance[index].address;
     var ethAmount = 1 * 10**16;
-    var rate = 0x47d40a969bd7c0021;
-    var expectedDgd = (ethAmount * rate / 10**18) / (10**18 / 10**tokenDecimals[1]);
+    var rate = ethToTokenRate[index];
+    var expectedTokenAmount = (ethAmount * rate.valueOf() / 10**18) / (10**18 / 10**tokenDecimals[1]);
     var destAddress = "0x001adbc838ede392b5b054a47f8b8c28f2fa9f3c";
 
     return network.trade(ethAddress,
                          ethAmount,
-                         dgdAddress,
+                         tokenAddress,
                          destAddress,
                          new BigNumber(2).pow(255),
                          rate,0,{value:ethAmount, gasPrice:49* 10**9}).then(function(result){
@@ -709,11 +718,11 @@ it("set eth to dgd rate", function() {
 
        return tokenInstance[1].balanceOf(destAddress);
     }).then(function(result){
-      if( result.valueOf() > expectedDgd.valueOf() + 10 ) {
-        assert.fail("unexpected dgd balacne", result.valueOf(), expectedDgd.valueOf() );
+      if( result.valueOf() > expectedTokenAmount.valueOf() + 10 ) {
+        assert.fail("unexpected token balance", result.valueOf(), expectedTokenAmount.valueOf() );
       }
-      if( result.valueOf() < expectedDgd.valueOf() - 10 ) {
-        assert.fail("unexpected dgd balacne", result.valueOf(), expectedDgd.valueOf() );
+      if( result.valueOf() < expectedTokenAmount.valueOf() - 10 ) {
+        assert.fail("unexpected token balance", result.valueOf(), expectedTokenAmount.valueOf() );
       }
     }).then(function(){
       return tokenInstance[1].balanceOf(network.address);
@@ -724,14 +733,15 @@ it("set eth to dgd rate", function() {
 
   it("do converse exchange", function() {
     this.timeout(31000000);
-    var dgdAddress = tokenInstance[1].address;
-    var dgdAmount = 10**tokenDecimals[1];//zelda
-    var rate = conversionRate;
+    var index = 1;
+    var tokenAddress = tokenInstance[index].address;
+    var tokenAmount = 10**tokenDecimals[index];//zelda
+    var rate = tokenToEthRate[index];
     var destAddress = "0x001adbc838ede392b5b054a47f8b8c28f2fa9f3c";
 
-    return tokenInstance[1].approve(network.address,dgdAmount).then(function(){
-      return network.trade(dgdAddress,
-                           dgdAmount,
+    return tokenInstance[1].approve(network.address,tokenAmount).then(function(){
+      return network.trade(tokenAddress,
+                           tokenAmount,
                            ethAddress,
                            destAddress,
                            new BigNumber(2).pow(255),
@@ -746,7 +756,7 @@ it("set eth to dgd rate", function() {
   it("check time duration block", function() {
     this.timeout(31000000);
     return pricing.validPriceDurationInBlocks().then(function(result){
-      assert.equal(result.valueOf(), 1000000, "unexpected valid price duation block");
+      assert.equal(result.valueOf(), 10000000, "unexpected valid price duation block");
     });
   });
 

@@ -2,63 +2,70 @@
   "tokens": {
     "OMG": {
       "name": "OmiseGO",
-      "decimals": 18
-    },
-    "DGD": {
-      "name": "Digix",
-      "decimals": 9
-    },
-    "CVC": {
-      "name": "Civic",
-      "decimals": 8
-    },
-    "FUN": {
-      "name": "FunFair",
-      "decimals": 8
-    },
-    "MCO": {
-      "name": "Monaco",
-      "decimals": 8
-    },
-    "GNT": {
-      "name": "Golem",
-      "decimals": 18
-    },
-    "ADX": {
-      "name": "Adex",
-      "decimals": 4
-    },
-    "PAY": {
-      "name": "TenX",
-      "decimals": 18
-    },
-    "BAT": {
-      "name": "BasicAttention",
-      "decimals": 18
+      "decimals": 18,
+      "tokenToEthRate": "14419842927957000",
+      "ethToTokenRate": "67891906521449010952"
     },
     "KNC": {
       "name": "KyberNetwork",
       "decimals": 18,
-      "reserve balance" : 999999
+      "tokenToEthRate": "3337963038087876",
+      "ethToTokenRate": "292344449412625772442"
     },
     "EOS": {
       "name": "Eos",
-      "decimals": 18
+      "decimals": 18,
+      "tokenToEthRate": "10134376786462498",
+      "ethToTokenRate": "96705407127935721074"
     },
-    "LINK": {
-      "name": "ChainLink",
-      "decimals": 18
+    "SNT": {
+      "name": "STATUS",
+      "decimals": 18,
+      "tokenToEthRate": "245373588559838",
+      "ethToTokenRate": "3987612104458408766621"
+    },
+    "ELF": {
+      "name": "AELF",
+      "decimals": 18,
+      "tokenToEthRate":"1388799845988964",
+      "ethToTokenRate":"703082157879274923681"
+    },
+    "POWR": {
+      "name": "Power Ledger",
+      "decimals": 6,
+      "tokenToEthRate":"858035058400034",
+      "ethToTokenRate":"1136674053852921533929"
+    },
+    "MANA": {
+      "name": "MANA",
+      "decimals": 18,
+      "tokenToEthRate":"141928562453295",
+      "ethToTokenRate":"6906762718560391215972"
+    },
+    "BAT": {
+      "name": "Basic Attention Token",
+      "decimals": 18,
+      "tokenToEthRate":"429182136955440",
+      "ethToTokenRate":"2281525574259667650615"
+    },
+    "REQ": {
+      "name": "Request",
+      "decimals": 18,
+      "tokenToEthRate":"329224361329438" ,
+      "ethToTokenRate":"2977089169417056461617"
+    },
+    "GTO": {
+      "name": "Gifto",
+      "decimals": 5,
+      "tokenToEthRate":"458955931519887",
+      "ethToTokenRate":"2126887566059020851609"
     }
   },
   "exchanges": [
-    "bittrex",
-    "liqui",
-    "poloniex",
-    "binance",
-    "bitfinex"
+    "bittrex"
   ],
 
-  "default reserve balances" : { "token" : 1000000, "ether" : 10 },
+  "default reserve balances" : { "token" : 10000000, "ether" : 2 },
 
   "special addresses" : {"nam":["0x385baa4d78c91e5ce6ccafab9e96fdc83ea4427d",
                                 "0x1d217486cdd98c6f565ef567cba26dc331660fb6",
@@ -72,5 +79,5 @@
 			 "spyrus" : "0x98AFFE24F6AE0e4826489516A0000Ed7c2fa58f2" },
 
 
-  "output filename" : "deployment_dev.json"
+  "output filename" : "deployment_kovan.json"
 }
