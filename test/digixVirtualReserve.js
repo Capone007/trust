@@ -13,7 +13,7 @@ let BigNumber = require('bignumber.js');
 
 //global variables
 //////////////////
-let precisionUnits = (new BigNumber(10).pow(18));
+let precision = (new BigNumber(10).pow(18));
 let ethAddress = '0x00eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
 let gasPrice = (new BigNumber(10).pow(9).mul(50));
 let negligibleRateDiff = 15;
@@ -54,31 +54,14 @@ let tokenAdd = [];
 
 // imbalance data
 const minimalRecordResolution = 2; //low resolution so I don't lose too much data. then easier to compare calculated imbalance values.
-const maxPerBlockImbalance = 4000;
-const maxTotalImbalance = maxPerBlockImbalance * 12;
+const maxPerBlockImbalance = (new BigNumber(10)).pow(10); // 10 tokens
+const maxTotalImbalance = maxPerBlockImbalance.mul(3);
 
 //base buy and sell rates (prices)
 let tokensPerEther;
 let ethersPerToken;
 let baseBuyRate = [];
 let baseSellRate = [];
-
-//quantity buy steps
-let qtyBuyStepX = [-1400, -700, -150, 0, 150, 350, 700,  1400];
-let qtyBuyStepY = [ 1000,   75,   25, 0,  0, -70, -160, -3000];
-
-//imbalance buy steps
-let imbalanceBuyStepX = [-8500, -2800, -1500, 0, 1500, 2800,  4500];
-let imbalanceBuyStepY = [ 1300,   130,    43, 0,   0, -110, -1600];
-
-//sell
-//sell price will be 1 / buy (assuming no spread) so sell is actually buy price in other direction
-let qtySellStepX = [-1400, -700, -150, 0, 150, 350, 700, 1400];
-let qtySellStepY = [-300,   -80,  -15, 0,   0, 120, 170, 3000];
-
-//sell imbalance step
-let imbalanceSellStepX = [-8500, -2800, -1500, 0, 1500, 2800,  4500];
-let imbalanceSellStepY = [-1500,  -320,   -75, 0,    0,  110,   650];
 
 //compact data.
 let sells = [];
@@ -111,40 +94,25 @@ contract('DigixVirtualReserve', function(accounts) {
         await pricing.addToken(digixAdd);
         await pricing.setTokenControlInfo(digixAdd, minimalRecordResolution, maxPerBlockImbalance, maxTotalImbalance);
         await pricing.enableTokenTrade(digixAdd);
-   
+
         await pricing.addOperator(operator);
         
         //set rates
-        tokensPerEther = (new BigNumber(precisionUnits.mul(7)).floor());
-        ethersPerToken = (new BigNumber(precisionUnits.div(7)).floor());
-//        console.log('tokensPerEther')
-//        console.log(tokensPerEther.valueOf())
-//        console.log('ethersPerToken')
-//        console.log(ethersPerToken.valueOf())
+        tokensPerEther = (new BigNumber(precision.mul(7)).floor());
+        ethersPerToken = (new BigNumber(precision.div(7)).floor());
+
 
         tokenAdd.push(digixAdd);
         baseBuyRate.push(tokensPerEther.valueOf());
         baseSellRate.push(ethersPerToken.valueOf());
-
-        console.log(tokenAdd)
-        console.log(baseBuyRate)
-        console.log(baseSellRate)
         buys.length = sells.length = indices.length = 0;
 
         await pricing.setBaseRate(tokenAdd, baseBuyRate, baseSellRate, buys, sells, currentBlock, indices, {from: operator});
-//
-//        //set compact data
-//        compactBuyArr = [0, 0, 0, 0, 0, 06, 07, 08, 09, 10, 11, 12, 13, 14];
-//        let compactBuyHex = Helper.bytesToHex(compactBuyArr);
-//        buys.push(compactBuyHex);
-//
-//        compactSellArr = [0, 0, 0, 0, 0, 26, 27, 28, 29, 30, 31, 32, 33, 34];
-//        let compactSellHex = Helper.bytesToHex(compactSellArr);
-//        sells.push(compactSellHex);
-//
-//        indices[0] = 0;
 
-//        await pricing.setCompactData(buys, sells, currentBlock, indices, {from: operator});
+        //set step functions to 0. otherwise it reverts.
+        let step0 = [0];
+        await pricing.setQtyStepFunction(digixAdd, step0, step0, step0, step0, {from: operator});
+        await pricing.setImbalanceStepFunction(digixAdd, step0, step0, step0, step0, {from: operator});
     });
 
     it("should init network and digix virtual reserve and one 'normal' reserve, send funds to all", async function () {
@@ -156,7 +124,7 @@ contract('DigixVirtualReserve', function(accounts) {
 
         //init digix virtual reserve
         // API: (address _kyberNetwork, ConversionRatesInterface _ratesContract, KyberReserveInterface _kyberReserve, address _admin
-        digixVirtualReserve = await DigixVirtualReserve.new(network.address, pricing.address, reserve.address, admin);
+        digixVirtualReserve = await DigixVirtualReserve.new(network.address, pricing.address, reserve.address, digixAdd, admin);
         await digixVirtualReserve.addOperator(operator);
         await digixVirtualReserve.addAlerter(alerter);
         await digixVirtualReserve.setTokenControlInfo(digixAdd, minimalRecordResolution, maxPerBlockImbalance, maxTotalImbalance);
@@ -205,66 +173,112 @@ contract('DigixVirtualReserve', function(accounts) {
         await network.listPairForReserve(digixVirtualReserve.address, digixAdd, ethAddress, true);
     });
 
-//    it("get conversion rate ether to digix and verify correct.", async function (){
-//        const srcQty = 100; //has no affect here
-//        const block = await web3.eth.blockNumber;
-//        console.log('ethAddress')
-//        console.log(ethAddress)
-//        console.log(ethAddress)
-//        console.log('digixAdd')
-//        console.log(digixAdd)
-//        console.log(digixAdd)
-//        let rxRate = await digixVirtualReserve.getConversionRate(ethAddress, digixAdd, srcQty, block);
-//
-//        assert.equal(rxRate.valueOf(), tokensPerEther.valueOf(), "bad conversion rate");
-//    })
+    it("get conversion rate digix to ether and verify correct.", async function (){
+        const srcQty = 100; //has no affect here
+        const block = await web3.eth.blockNumber;
+        let rxRate = await digixVirtualReserve.getConversionRate(digixAdd, ethAddress, srcQty, block);
+        assert.equal(rxRate.valueOf(), ethersPerToken.valueOf(), "bad conversion rate");
+    })
 
-//    it("get conversion rate digix to ether and verify correct.", async function (){
-//        const block = await web3.eth.blockNumber;
-//        let srcQty = 100; //has no affect in digix get rate
-////
-////        //calculate expected rate digix to ether == digix dollar price / ether dollar price
-////        let ethDollarValue = (new BigNumber(dollarsPerEtherWei)).div((new BigNumber(10)).pow(18));
-////        let digixDollarValue = (new BigNumber(bid1000Digix)).div(new BigNumber(1000));
-////        let expectedRate = (digixDollarValue.div(ethDollarValue)) / 1;
-//
-//        let rxRate = await digixReserve.getConversionRate(digix.address, ethAddress, srcQty, block);
-////        rxRate = new BigNumber(rxRate.valueOf());
-////        rxRate = (rxRate.div(precision)).valueOf() / 1;
-//
-//        assert.equal(rxRate.valueOf(), ethersPerToken.valueOf(), "bad conversion rate");
-//    })
-//
+    it("get conversion rate ether to digix and verify correct.", async function (){
+        const srcQty = 100; //has no affect here
+        const block = await web3.eth.blockNumber;
+        let rxRate = await digixVirtualReserve.getConversionRate(ethAddress, digixAdd, srcQty, block);
+        assert.equal(rxRate.valueOf(), tokensPerEther.valueOf(), "bad conversion rate");
+    })
+
+    it("get expected rate, ether to digix, from network. verify correct.", async function (){
+        const qty = 100; //has no affect here
+        //verify base rate
+        let buyRate = await network.getExpectedRate(ethAddress, digixAdd, qty);
+        assert.equal(buyRate[0].valueOf(), tokensPerEther.valueOf(), "unexpected rate.");
+    })
+
+    it("get conversion rate ether to digix and verify correct.", async function (){
+        const qty = 100; //has no affect here
+        //verify base rate
+        let buyRate = await network.getExpectedRate(digixAdd, ethAddress, qty);
+        assert.equal(buyRate[0].valueOf(), ethersPerToken.valueOf(), "unexpected rate.");
+    })
+
+
     it("trade ether to digix. check balances", async function () {
-        let amountWei = (new BigNumber(10)).pow(15);
+        let amountWei = (new BigNumber(10)).pow(12);
+        let maxDestAmount = (new BigNumber(10)).pow(15);
 
         //verify base rate
-//        let buyRate = await network.getExpectedRate(ethAddress, digixAdd, amountWei);
-//        console.log(buyRate);
-//        assert.equal(buyRate[0].valueOf(), tokensPerEther.valueOf(), "unexpected rate.");
-//
+        let buyRate = await network.getExpectedRate(ethAddress, digixAdd, amountWei);
+        assert.equal(buyRate[0].valueOf(), tokensPerEther.valueOf(), "unexpected rate.");
+
+        //initial balances
         let reserveStartEthbalance = await Helper.getBalancePromise(reserve.address);
         let networkStartDigixBalance = await digix.balanceOf(network.address);
+        let user2StartDigixBalance = await digix.balanceOf(user2);
 
         //perform trade
-        await network.trade(ethAddress, amountWei, digixAdd, user2, 100, 0, walletId, {from:user1, value:amountWei});
+        //API: trade(src, srcAmount, dest, destAddress, maxDestAmount, minConversionRate, walletId)
 
-        //check higher ether balance on reserve
+        await network.trade(ethAddress, amountWei, digixAdd, user2, maxDestAmount, 0, walletId, {from:user1, value:amountWei});
+
+        //check higher ether balance on reserve (not digix reserve which FW the amount)
         let expectedReserveEtherBalance = amountWei.add(reserveStartEthbalance);
         let balance = await Helper.getBalancePromise(reserve.address);
         assert.equal(balance.valueOf(), expectedReserveEtherBalance.valueOf(), "bad reserve balance wei");
-//
-//        //check token balances
-//        ///////////////////////
-//
-//        //check token balance on user2
-//        let tokenTweiBalance = await digix.balanceOf(user2);
-//        let expectedTweiAmount = expectedRate.mul(amountWei).div(precisionUnits).floor();
-//        assert.equal(tokenTweiBalance.valueOf(), expectedTweiAmount.valueOf(), "bad token balance");
-//
-//        //check lower token balance on network
-//        reserve2TokenBalance[tokenInd] -= expectedTweiAmount;
-//        let reportedBalance = await token.balanceOf(reserve2.address);
+
+        //check token balances
+        ///////////////////////
+
+        //check token balance on user2
+        let user2DigixBalance = await digix.balanceOf(user2);
+        let expectedDestQuantity = calcDstQty(amountWei, 18, 9, tokensPerEther);
+        let user2ExpectedDigixBalance = user2StartDigixBalance.add(expectedDestQuantity);
+        //reduce digix commision...
+        user2ExpectedDigixBalance = user2ExpectedDigixBalance.mul(9987).div(10000).floor();
+        assert.equal(user2DigixBalance.valueOf(), user2ExpectedDigixBalance.valueOf(), "bad token balance");
+
+        //check lower token balance on network
+        let networkDigixBalance = await digix.balanceOf(network.address);
+        let expectedNetworkBalance = networkStartDigixBalance.sub(expectedDestQuantity);
+        assert.equal(networkDigixBalance.valueOf(), expectedNetworkBalance.valueOf(), "bad network balance");
+    });
+
+    it("trade digix to ether. check balances", async function () {
+        let maxDestAmount = (new BigNumber(10)).pow(19);
+        let user2StartDigixBalance = await digix.balanceOf(user2);
+
+        //verify base rate
+        let buyRate = await network.getExpectedRate(digixAdd, ethAddress, user2StartDigixBalance);
+        assert.equal(buyRate[0].valueOf(), ethersPerToken.valueOf(), "unexpected rate.");
+
+        //initial balances
+        let reserveStartEthbalance = new BigNumber(await Helper.getBalancePromise(reserve.address));
+        let networkStartDigixBalance = await digix.balanceOf(network.address);
+
+        digix.approve(network.address, user2StartDigixBalance, {from: user2});
+
+        //perform trade
+        //API: trade(src, srcAmount, dest, destAddress, maxDestAmount, minConversionRate, walletId)
+        await network.trade(digixAdd, user2StartDigixBalance, ethAddress, user1, maxDestAmount, 0, walletId, {from:user2});
+
+        let expectedDestQuantity = calcDstQty(user2StartDigixBalance, 9, 18, ethersPerToken);
+
+        //check lower ether balance on reserve (not digix reserve which FW the amount)
+        let expectedReserveEtherBalance = reserveStartEthbalance.sub(expectedDestQuantity);
+        let balance = await Helper.getBalancePromise(reserve.address);
+        assert.equal(balance.valueOf(), expectedReserveEtherBalance.valueOf(), "bad reserve balance wei");
+
+        //check token balances
+        ///////////////////////
+
+        //expect zero digix for user2
+        let user2DigixBalance = await digix.balanceOf(user2);
+        assert.equal(user2DigixBalance.valueOf(), 0, "bad token balance");
+
+        //check higher digix balance on network
+        let networkDigixBalance = await digix.balanceOf(network.address);
+        let transferValue = user2StartDigixBalance * 9987 / 10000
+        let expectedNetworkBalance = networkStartDigixBalance.add(transferValue).floor();
+        assert.equal(networkDigixBalance.valueOf(), expectedNetworkBalance.valueOf(), "bad network balance");
     });
 });
 
@@ -275,40 +289,14 @@ function convertRateToConversionRatesRate (baseRate) {
     return ((new BigNumber(10).pow(18)).mul(baseRate).floor());
 };
 
-function getExtraBpsForBuyQuantity(qty) {
-    for (let i = 0; i < qtyBuyStepX.length; i++) {
-        if (qty <= qtyBuyStepX[i]) return qtyBuyStepY[i];
-    }
-    return qtyBuyStepY[qtyBuyStepY.length - 1];
-};
-
-function getExtraBpsForSellQuantity(qty) {
-    for (let i = 0; i < qtySellStepX.length; i++) {
-        if (qty <= qtySellStepX[i]) return qtySellStepY[i];
-    }
-    return qtySellStepY[qtySellStepY.length - 1];
-};
-
-function getExtraBpsForImbalanceBuyQuantity(qty) {
-    for (let i = 0; i < imbalanceBuyStepX.length; i++) {
-        if (qty <= imbalanceBuyStepX[i]) return imbalanceBuyStepY[i];
-    }
-    return (imbalanceBuyStepY[imbalanceBuyStepY.length - 1]);
-};
-
-function getExtraBpsForImbalanceSellQuantity(qty) {
-    for (let i = 0; i < imbalanceSellStepX.length; i++) {
-        if (qty <= imbalanceSellStepX[i]) return imbalanceSellStepY[i];
-    }
-    return (imbalanceSellStepY[imbalanceSellStepY.length - 1]);
-};
-
 function addBps (rate, bps) {
     return (rate.mul(10000 + bps).div(10000));
 };
 
-function compareRates (receivedRate, expectedRate) {
-    expectedRate = expectedRate - (expectedRate % 10);
-    receivedRate = receivedRate - (receivedRate % 10);
-    assert.equal(expectedRate, receivedRate, "different rates");
-};
+function calcDstQty(srcQty, srcDecimals, dstDecimals, rate) {
+     if (dstDecimals >= srcDecimals) {
+        return ((srcQty.mul(rate)).mul((new BigNumber(10).pow(dstDecimals - srcDecimals)))).div(precision).floor();
+    } else {
+        return (srcQty.mul(rate)).div(precision.mul((new BigNumber(10)).pow(srcDecimals - dstDecimals))).floor();
+    }
+}

@@ -4,41 +4,40 @@ pragma solidity 0.4.18;
 import "./ERC20Interface.sol";
 import "./Utils.sol";
 import "./Withdrawable.sol";
-import "./ConversionRates.sol";
 import "./SanityRatesInterface.sol";
 import "./KyberReserveInterface.sol";
-import "./KyberReserve.sol";
 import "./VolumeImbalanceRecorder.sol";
+import "./KyberReserve.sol";
+import "./ConversionRates.sol";
 
 
 /// @title Kyber Reserve contract
-contract DigixVirtualReserve is KyberReserveInterface, Withdrawable, Utils, VolumeImbalanceRecorder {
+contract DigixVirtualReserve is KyberReserveInterface, VolumeImbalanceRecorder, Utils {
 
     address public kyberNetwork;
     KyberReserve public kyberReserve; //will be used as source for ethers. This reserve will not hold funds
     ConversionRates public conversionRatesContract;
     SanityRatesInterface public sanityRatesContract;
     bool public tradeEnabled;
-    ERC20 public digix = ERC20(0x4f3AfEC4E5a3F2A6a1A411DEF7D7dFe50eE057bF);
+    ERC20 public digix;
     mapping(bytes32=>bool) public approvedWithdrawAddresses; // sha3(token,address)=>bool
-    uint public buyTransferFee = 13; //Digix token has transaction fees we should compensate for our flow to work
-    uint public sellTransferFee = 13;
 
     function DigixVirtualReserve(
         address _kyberNetwork,
         ConversionRates _ratesContract,
         KyberReserve _kyberReserve,
+        ERC20 _digix,
         address _admin
-        ) public
+        ) public VolumeImbalanceRecorder(_admin)
     {
-        require(_admin != address(0));
         require(_ratesContract != address(0));
         require(_kyberNetwork != address(0));
         require(_kyberReserve != address(0));
+        require(_digix != address(0));
         kyberReserve = _kyberReserve;
         kyberNetwork = _kyberNetwork;
         conversionRatesContract = _ratesContract;
-        admin = _admin;
+        digix = _digix;
     }
 
     event DepositToken(ERC20 token, uint amount);
@@ -138,18 +137,8 @@ contract DigixVirtualReserve is KyberReserveInterface, Withdrawable, Utils, Volu
     }
 
     function setKyberReserve(KyberReserve _kyberReserve) public onlyAdmin {
-        require(_kyberReserve != KyberReserve(0));
+        require(_kyberReserve != address(0));
         kyberReserve = _kyberReserve;
-    }
-
-    function setBuyFeeBps(uint fee) public onlyAdmin {
-        require(fee < 10000);
-        buyTransferFee = fee;
-    }
-
-    function setSellFeeBps(uint fee) public onlyAdmin {
-        require(fee < 10000);
-        sellTransferFee = fee;
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -157,7 +146,7 @@ contract DigixVirtualReserve is KyberReserveInterface, Withdrawable, Utils, Volu
     ////////////////////////////////////////////////////////////////////////////
     function getBalance(ERC20 token) public view returns(uint) {
         if (token == ETH_TOKEN_ADDRESS)
-            return this.balance;
+            return kyberReserve.balance;
         else {
             if (token == digix) return token.balanceOf(kyberNetwork);
             else return token.balanceOf(this);
@@ -179,43 +168,42 @@ contract DigixVirtualReserve is KyberReserveInterface, Withdrawable, Utils, Volu
     }
 
     function getConversionRate(ERC20 src, ERC20 dest, uint srcQty, uint blockNumber) public view returns(uint) {
-        ERC20 token;
         bool  buy;
 
         if (!tradeEnabled) return 0;
+
+        if (ETH_TOKEN_ADDRESS == src) {
+            if (dest != digix) return 0;
+            buy = true;
+        } else if (ETH_TOKEN_ADDRESS == dest) {
+            if (src != digix) return 0;
+            buy = false;
+        } else {
+            return 0; // pair is not listed
+        }
 
         // check imbalance
         int totalImbalance;
         int blockImbalance;
         (totalImbalance, blockImbalance) =
-            getImbalance(token, conversionRatesContract.getRateUpdateBlock(digix), blockNumber);
+            getImbalance(digix, conversionRatesContract.getRateUpdateBlock(digix), blockNumber);
 
-        if (ETH_TOKEN_ADDRESS == src) {
-            buy = true;
-            token = dest;
-        } else if (ETH_TOKEN_ADDRESS == dest) {
-            buy = false;
-            token = src;
-        } else {
-            return 0; // pair is not listed
-        }
 
-        uint rate = conversionRatesContract.getRate(token, blockNumber, buy, srcQty);
+        uint rate = conversionRatesContract.getRate(digix, blockNumber, buy, srcQty);
         uint destQty = getDestQty(src, dest, srcQty, rate);
         int imbalanceQty;
 
+        // compute digix quantity for imbalance
         if (buy) {
-            // compute token qty
             imbalanceQty = int(destQty);
             totalImbalance += imbalanceQty;
         } else {
-            // compute token qty
             imbalanceQty = -1 * int(srcQty);
             totalImbalance += imbalanceQty;
         }
 
-        if (abs(totalImbalance) >= getMaxTotalImbalance(token)) return 0;
-        if (abs(blockImbalance + imbalanceQty) >= getMaxPerBlockImbalance(token)) return 0;
+        if (abs(totalImbalance) >= getMaxTotalImbalance(digix)) return 0;
+        if (abs(blockImbalance + imbalanceQty) >= getMaxPerBlockImbalance(digix)) return 0;
 
         if (getBalance(dest) < destQty) return 0;
 
@@ -248,10 +236,13 @@ contract DigixVirtualReserve is KyberReserveInterface, Withdrawable, Utils, Volu
         // can skip validation if done at kyber network level
         if (validate) {
             require(conversionRate > 0);
-            if (srcToken == ETH_TOKEN_ADDRESS)
+            if (srcToken == ETH_TOKEN_ADDRESS) {
+                require(destToken == digix);
                 require(msg.value == srcAmount);
-            else
+            } else {
                 require(msg.value == 0);
+                require(srcToken == digix);
+            }
         }
 
         uint destAmount = getDestQty(srcToken, destToken, srcAmount, conversionRate);
