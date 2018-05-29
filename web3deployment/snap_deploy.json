@@ -1,0 +1,95 @@
+{
+  "tokens": {
+    "KNC": {
+      "name": "KyberNetwork",
+      "decimals": 18,
+      "address": "0xdd974D5C2e2928deA5F71b9825b8b646686BD200",
+      "minimalRecordResolution": "1000000000000000",
+      "maxPerBlockImbalance": "2711997842670896021504",
+      "maxTotalImbalance": "3833713935933528080384"
+    },
+    "ETH": {
+      "name": "Ethereum",
+      "decimals": 18,
+      "address": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  },
+  "exchanges": {
+    "binance": {}
+  },
+  "permission": {
+    "KyberNetwork": {
+      "admin": "0x2C7f07e07459340025046bf77C2FdcC1c86Fd4Ff",
+      "operator": [
+        "0x2C7f07e07459340025046bf77C2FdcC1c86Fd4Ff"
+      ],
+      "alerter": []
+    },
+    "KyberReserve": {
+      "admin": "0x3e4BEDdEBE153895A9282adAE1d7055CD475DbAD",
+      "operator": [
+        "0xc8ac660DB1d94a2CF48630DB51Fb25e6B965566b"
+      ],
+      "alerter": [
+        "0xc8ac660DB1d94a2CF48630DB51Fb25e6B965566b"
+      ]
+    },
+    "ConversionRates": {
+      "admin": "0x3e4BEDdEBE153895A9282adAE1d7055CD475DbAD",
+      "operator": [
+        "0xc8ac660DB1d94a2CF48630DB51Fb25e6B965566b"
+      ],
+      "alerter": [
+        "0xc8ac660DB1d94a2CF48630DB51Fb25e6B965566b"
+      ]
+    },
+    "FeeBurner": {
+      "admin": "0x2C7f07e07459340025046bf77C2FdcC1c86Fd4Ff",
+      "operator": [
+        "0x2C7f07e07459340025046bf77C2FdcC1c86Fd4Ff"
+      ],
+      "alerter": []
+    },
+    "WhiteList": {
+      "admin": "0x2C7f07e07459340025046bf77C2FdcC1c86Fd4Ff",
+      "operator": [
+        "0x2C7f07e07459340025046bf77C2FdcC1c86Fd4Ff"
+      ],
+      "alerter": []
+    },
+    "ExpectedRate": {
+      "admin": "0x2C7f07e07459340025046bf77C2FdcC1c86Fd4Ff",
+      "operator": [
+        "0x2C7f07e07459340025046bf77C2FdcC1c86Fd4Ff"
+      ],
+      "alerter": []
+    }
+  },
+  "whitelist params": {
+    "testers": [
+      "0xF5235cd28f92C8E1e99510533BeC0b7836f122aa",
+      "0x1967B34a36409b9b78Cc5b38d600CD1ce8D2815a"
+    ],
+    "testers category": 9,
+    "testers cap": 5000,
+    "KGT address": "0xfce10cbf5171dc12c215bbcca5dd75cbaea72506",
+    "KGT cap": 0,
+    "users": [],
+    "users category": 1,
+    "users cap": 0,
+    "default cap": 0
+  },
+  "max gas price": "50000000000",
+  "neg diff in bps": 20,
+  "min expected rate slippage": 300,
+  "KNC wallet": "0xBC33a1F908612640F2849b56b67a4De4d179C151",
+  "KNC to ETH rate": 300,
+  "tax wallet address": "",
+  "tax fees bps": 2000,
+  "valid duration block": 1000,
+  "reserve": "0xF8E49Cf10BD4C6dB582582b4DB23ba7ff8B63919",
+  "pricing": "0x2814B314f6b8a1F7B3ba379fb23F211e4b5B2AE0",
+  "network": "0xC6818B45dd467EeF750379850Adc1Be7a83dC04f",
+  "wrapper": "0xE11b50577E59f8d60998BC78EE9eC3898d66A169",
+  "feeburner": "0xb35A06Ed89D431cBa34Df9A69BdE31A7379B9990"
+}
