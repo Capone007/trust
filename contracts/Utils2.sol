@@ -39,10 +39,7 @@ contract Utils2 is Utils {
                 // call failed
                 decimal = 18;
             } else {
-                assembly {
-                    returndatacopy(value, 0, returndatasize)
-                }
-                decimal = value[0];
+                decimal = token.decimals();
             }
         }
 
