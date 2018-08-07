@@ -690,7 +690,107 @@ async function readReserve(reserveAdd, index, isKyberReserve){
         if(blockCodeSha3 != reserveV1Sha3BlockCode) {
             myLog(0, 0, '');
             myLog(1, 0, "Byte code from block chain reserve V1, doesn't match locally compiled code.")
+            myLog(0, 0, 'received sha3 was: ' + blockCodeSha3);
             myLog(0, 0, '');
+            return;
+        } else {
+            Reserves[index] = await new web3.eth.Contract(reserveV1ABI, reserveAdd);
+            Reserve = Reserves[index];
+            myLog(0, 0, "sha3 of Code on blockchain matches sha3 for reserve V1 code.");
+            myLog(0, 0, '');
+        }
+
+    } else {
+        Reserves[index] = await new web3.eth.Contract(reserveABI, reserveAdd);
+        Reserve = Reserves[index];
+        myLog(0, 0, "Code on blockchain matches locally compiled code");
+        myLog(0, 0, '');
+    }
+
+    if (isKyberReserve) await printAdminAlertersOperators(Reserve, "KyberReserve");
+
+    //read addresses
+    let enabled = await await Reserve.methods.tradeEnabled().call();
+    myLog((enabled == false), 0, ("trade enabled = " + enabled));
+
+    let kyber = (await Reserve.methods.kyberNetwork().call()).toLowerCase();
+    myLog((kyber != jsonNetworkAdd), 0, ("kyberNetwork " + kyber));
+    ratesAdd[index] = (await Reserve.methods.conversionRatesContract().call()).toLowerCase();
+    myLog((index == 0 && jsonRatesAdd != ratesAdd[0]), 0, ("ratesAdd " + index + ": " + ratesAdd[index]));
+    sanityRateAdd[index] = await Reserve.methods.sanityRatesContract().call();
+    myLog(0, 0, ("sanityRateAdd " + index + ": " + sanityRateAdd[index]));
+
+//    await reportReserveBalance(reserveAdd);
+
+    if (isKyberReserve) await verifyApprovedWithdrawAddress(Reserve, isKyberReserve);
+
+    //call contracts
+    await readFeeBurnerDataForReserve(feeBurnerAdd, reserveAdd, index, isKyberReserve);
+    await readConversionRate(ratesAdd[index], reserveAdd, index, isKyberReserve);
+    await readSanityRate(sanityRateAdd[index], reserveAdd, index, tokensPerReserve[index], isKyberReserve);
+
+    //after conversion rate run, tokens are list for this reserve is updated
+    await reportReserveBalance(reserveAdd, index, tokensPerReserve[index], Reserve, isExternalWallet);
+};
+
+let wrapperReserveABI;
+let needWrapperReadReserveABI = 1;
+
+async function readReserve(reserveAdd, index, isKyberReserve){
+    if (needWrapperReadReserveABI == 1) {
+        needWrapperReadReserveABI = 0;
+        try {
+            let abi = solcOutput.contracts["KyberReserve.sol:KyberReserve"].interface;
+            reserveABI = JSON.parse(abi);
+        } catch (e) {
+            myLog(0, 0, e);
+            throw e;
+        }
+    }
+    if (needReadReserveV1ABI == 1) {
+        needReadReserveV1ABI = 0;
+        try {
+            let abi = solcOutput.contracts["KyberReserveV1.sol:KyberReserveV1"].interface;
+            reserveV1ABI = JSON.parse(abi);
+        } catch (e) {
+            myLog(0, 0, e);
+            throw e;
+        }
+    }
+
+
+    let abi = solcOutput.contracts["KyberReserve.sol:KyberReserve"].interface;
+
+    myLog(0, 0, '');
+    myLog(0, 0, '');
+
+    myLog(0, 0, ("Reserve " + index + " address: " + await a2n(reserveAdd, 1)));
+    myLog(0, 0, ("---------------------------------------------------------"));
+
+    //verify binary as expected.
+    let blockCode = await web3.eth.getCode(reserveAdd);
+    let solcCode = '0x' + (solcOutput.contracts["KyberReserve.sol:KyberReserve"].runtimeBytecode);
+
+    let Reserve;
+    let isExternalWallet = true;
+
+    if (blockCode != solcCode){
+//        myLog(1, 0, "blockchain Code:");
+//        myLog(0, 0, blockCode);
+        isExternalWallet = false;
+
+        let blockCodeSha3 = await web3.utils.sha3(blockCode);
+
+//        myLog(1, 0, "blockCodeSha3 " + blockCodeSha3);
+        Reserves[index] = await new web3.eth.Contract(reserveV1ABI, reserveAdd);
+        Reserve = Reserves[index];
+
+        if(blockCodeSha3 != reserveV1Sha3BlockCode) {
+            myLog(0, 0, '');
+            myLog(1, 0, "Byte code from block chain reserve V1, doesn't match locally compiled code.")
+            myLog(0, 0, 'received sha3 was: ' + blockCodeSha3);
+            myLog(0, 0, '');
+            return;
         } else {
             Reserves[index] = await new web3.eth.Contract(reserveV1ABI, reserveAdd);
             Reserve = Reserves[index];

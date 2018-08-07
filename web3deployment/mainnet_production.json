@@ -407,6 +407,13 @@
       "internal use": false,
       "listed": true
     },
+    "TOMO": {
+      "name": "Tomocoin",
+      "decimals": 18,
+      "address": "0x8b353021189375591723E7384262F45709A3C3dC",
+      "internal use": false,
+      "listed": true
+    },
     "ETH": {
       "name": "Ethereum",
       "decimals": 18,
